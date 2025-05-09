@@ -1,0 +1,126 @@
+﻿@{
+    ViewData["Title"] = "Hosted Checkout";
+}
+
+<h2>Mastercard Hosted Checkout</h2>
+
+<form id="checkoutForm">
+    <label>Amount:</label>
+    <input type="text" name="amount" value="250.00" required /><br />
+
+    <label>Currency:</label>
+    <input type="text" name="currency" value="GHS" required /><br />
+
+    <label>Order ID:</label>
+    <input type="text" name="orderId" value="@Guid.NewGuid().ToString()" required /><br />
+
+    <label>Return URL:</label>
+    <input type="text" name="returnUrl" value="https://dev.cspay.app/ZenithPayment/CreatePayment" required /><br />
+
+    <label>Merchant Name:</label>
+    <input type="text" name="merchant.name" value="Your Merchant Name" required /><br />
+
+    <label>Address Line 1:</label>
+    <input type="text" name="merchant.address.line1" value="123 Street" required /><br />
+
+    <label>Address Line 2:</label>
+    <input type="text" name="merchant.address.line2" value="City, Country" required /><br />
+
+    <input type="hidden" name="apiOperation" value="PURCHASE" />
+
+    <button type="submit">Pay Now</button>
+</form>
+<script src="https://test-fab.gateway.mastercard.com/static/checkout/checkout.min.js"
+        data-error="errorCallback"
+        data-cancel="cancelCallback">
+</script>
+
+@* <script src="https://fab.gateway.mastercard.com/static/checkout/checkout.min.js" data-error="errorCallback" data-cancel="cancelCallback"></script>
+ *@@* <script src="https://fab.gateway.mastercard.com/checkout/version/63/checkout.js"
+        data-error="errorCallback"
+        data-cancel="cancelCallback">
+</script> *@
+@* <script src="https://test-gateway.mastercard.com/checkout/version/61/checkout.js"
+        data-error="errorCallback"
+        data-cancel="cancelCallback">
+</script> *@
+
+<script>
+    // function errorCallback(error) {
+    //     alert("Error: " + JSON.stringify(error));
+    // }
+
+    function cancelCallback() {
+        alert("Payment was cancelled.");
+    }
+
+      function errorCallback(error) {
+        console.log('Payment Error:', JSON.stringify(error));
+        alert('Payment Error: ' + error.message);
+    }
+
+
+    document.getElementById("checkoutForm").addEventListener("submit", function (e) {
+        e.preventDefault();
+        console.log("Form submitted");
+
+        const formData = new FormData(this);
+        const obj = Object.fromEntries(formData.entries());
+
+        // Debug: Log raw form entries
+        console.log("Raw form entries:", obj);
+
+        const payload = {
+            amount: obj.amount,
+            currency: obj.currency,
+            orderId: obj.orderId,
+            returnUrl: obj.returnUrl,
+            apiOperation: obj.apiOperation,
+            merchant: {
+                name: obj["merchant.name"],
+                address: {
+                    line1: obj["merchant.address.line1"],
+                    line2: obj["merchant.address.line2"]
+                }
+            }
+        };
+
+        console.log("Payload being sent to CreateSession:", payload);
+
+        fetch('/Payment/CreateSession', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+            .then(res => {
+                console.log("Response status:", res.status);
+                return res.json();
+            })
+            .then(data => {
+                console.log("CreateSession response:", data);
+                debugger;
+                if (data.session && data.session.id) {
+                    console.log("Session ID:", data.session.id);
+                    debugger;
+                    Checkout.configure({
+                        session: { id: data.session.id },
+                        interaction: {
+                            merchant: payload.merchant
+                        }
+                    });
+
+                    console.log("Calling Checkout.showPaymentPage()");
+                    Checkout.showPaymentPage();
+                } else {
+                    console.error("Invalid response or missing session ID");
+                    alert("Session creation failed.");
+                }
+            })
+            .catch(err => {
+                console.error("Error during fetch:", err);
+                alert("Something went wrong. Check browser console for details.");
+            });
+    });
+
+</script>
+
